@@ -1,15 +1,14 @@
-from flask import Flask, request, jsonify, send_from_directory
-from flask_cors import CORS
+import streamlit as st
 import tensorflow as tf
 import numpy as np
 from PIL import Image
-import os
 
-app = Flask(__name__, static_folder=".")
-CORS(app)
+# Load model
+@st.cache_resource
+def load_model():
+    return tf.keras.models.load_model("asl_cnn_model.keras")
 
-# Load trained model
-model = tf.keras.models.load_model("model.keras")
+model = load_model()
 
 # Class labels
 class_names = [
@@ -19,39 +18,30 @@ class_names = [
 
 IMG_SIZE = 64
 
-def preprocess_image(image):
+def preprocess(image):
     image = image.resize((IMG_SIZE, IMG_SIZE))
     image = np.array(image) / 255.0
     image = np.expand_dims(image, axis=0)
     return image
 
-@app.route("/")
-def home():
-    return send_from_directory(".", "index.html")
+# UI
+st.set_page_config(page_title="Sign Language Recognition")
 
-@app.route("/predict", methods=["POST"])
-def predict():
+st.title("Sign Language Recognition")
+st.write("Upload an image of a hand sign")
 
-    if 'file' not in request.files:
-        return jsonify({"error": "No file uploaded"})
+uploaded_file = st.file_uploader("Choose an image...", type=["jpg","png","jpeg"])
 
-    file = request.files['file']
-    image = Image.open(file).convert("RGB")
+if uploaded_file:
+    image = Image.open(uploaded_file).convert("RGB")
+    st.image(image, caption="Uploaded Image")
 
-    processed = preprocess_image(image)
+    if st.button("Predict"):
+        processed = preprocess(image)
+        predictions = model.predict(processed)
 
-    predictions = model.predict(processed)
+        predicted_index = np.argmax(predictions)
+        confidence = float(np.max(predictions))
 
-    predicted_index = np.argmax(predictions)
-    confidence = float(np.max(predictions))
-
-    predicted_label = class_names[predicted_index]
-
-    return jsonify({
-        "prediction": predicted_label,
-        "confidence": confidence
-    })
-
-
-if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000)
+        st.success(f"Prediction: {class_names[predicted_index]}")
+        st.info(f"Confidence: {confidence:.2f}")
