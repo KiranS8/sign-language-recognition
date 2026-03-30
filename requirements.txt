@@ -1,6 +1,4 @@
+streamlit
 tensorflow
-flask
-flask-cors
 numpy
 pillow
-opencv-python
